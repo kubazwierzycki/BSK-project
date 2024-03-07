@@ -87,8 +87,8 @@ class GenerateKeysApp(tk.Tk):
         self.pin_number.place(x=100, y=70)
 
         # generation of keys
-        self.verify_button = tk.Button(self, text='Generation of keys', command=self.generate_keys)
-        self.verify_button.config(width=40)
-        self.verify_button.place(x=20, y=100)
+        self.generate_button = tk.Button(self, text='Generation of keys', command=self.generate_keys)
+        self.generate_button.config(width=40)
+        self.generate_button.place(x=20, y=100)
 
         self.pendrive_path = None
