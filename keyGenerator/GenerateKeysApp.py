@@ -5,9 +5,8 @@ import psutil
 from tkinter import messagebox
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
-from Crypto.Cipher import AES
-from Crypto.Hash import SHA256
 
 BACKGROUND_COLOR = '#ADD8E6'
 FOREGROUND_COLOR = '#000000'
@@ -29,24 +28,23 @@ class GenerateKeysApp(tk.Tk):
         private_key = rsa.generate_private_key(
             public_exponent=65537, key_size=2048, backend=default_backend()
         )
-        private_key_format = private_key.private_bytes(
+
+        # generate hash for pin
+        key_hash = hashes.Hash(hashes.SHA256())
+        key_hash.update(pin.encode('utf-8'))
+        key = key_hash.finalize()
+
+        # encrypt private_key and change format to .pem
+        encrypted_private_key = private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption()
+            encryption_algorithm=serialization.BestAvailableEncryption(key)
         )
-
-        key = SHA256.new()
-        key.update(pin.encode('utf-8'))
-        key = key.digest()
-        cipher = AES.new(key, AES.MODE_EAX)
-        encrypted_private_key = cipher.encrypt(private_key_format)
-
         with open(f"{self.pendrive_path}private_key.pem", "wb") as private_key_file:
             private_key_file.write(encrypted_private_key)
 
         # generate and save public key
         public_key = private_key.public_key()
-
         public_key_format = public_key.public_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo
@@ -65,7 +63,6 @@ class GenerateKeysApp(tk.Tk):
                 messagebox.showwarning('Warning', 'The pendrive is not found!')
             else:
                 regex = regex[0]
-                print(f'PIN: {regex} - path: {self.pendrive_path}')
                 self.save_keys(regex)
         else:
             messagebox.showwarning('Warning', 'The PIN number must contain only digits!')
