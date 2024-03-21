@@ -4,6 +4,7 @@ import os
 import re
 import xml.dom.minidom
 import psutil
+import base64
 
 from tkinter import filedialog, messagebox, simpledialog
 from cryptography.hazmat.backends import default_backend
@@ -65,7 +66,6 @@ class GUI_Manager:
 
     def choose_file(self):
         file_path = filedialog.askopenfilename(filetypes=(("Text files", "*.txt*"), ("PDF files", "*.pdf*")))
-        print(file_path)
         file_extension = file_path.split('.')[-1]
         if file_extension in ['pdf', 'txt']:
             file_name = file_path.split('/')[-1]
@@ -100,7 +100,6 @@ class GUI_Manager:
 
     def choose_public_key(self):
         key_path = filedialog.askopenfilename(filetypes=(("PEM files", "*.pem*"),))
-        print(key_path)
         file_extension = key_path.split('.')[-1]
         if file_extension == 'pem':
             file_name = key_path.split('/')[-1]
@@ -111,11 +110,28 @@ class GUI_Manager:
             self.gui.public_key_info.config(text='NOT FOUND')
             messagebox.showwarning('Warning', 'Wrong file!')
 
-    def verify_document(self, public_key_path, document_path, signature_path):
-        #
-        # to implement verification
-        #
-        return True
+    def verify_document(self, signature_path):
+        # read encrypted file hash from signature file
+        try:
+            signature = xml.dom.minidom.parse(signature_path)
+            encrypted_hash = signature.getElementsByTagName('encrypted_hash')[0].firstChild.data
+            encrypted_hash = base64.b64decode(encrypted_hash)
+        except:
+            messagebox.showerror('Error', 'Signature file is incorrect!')
+            return False
+
+        public_key = self.get_public_key()
+        if public_key is None:
+            return False
+
+        # get file hash
+        file_hash = self.get_document_hash()
+
+        try:
+            public_key.verify(encrypted_hash, file_hash, padding.PKCS1v15(), hashes.SHA256())
+            return True
+        except:
+            return False
 
     def verify_file(self):
         if self.gui.file_path is None:
@@ -124,10 +140,9 @@ class GUI_Manager:
             messagebox.showwarning('Warning', 'The public key is not found!')
         else:
             file_path = filedialog.askopenfilename(filetypes=(("XML files", "*.xml*"),))
-            print(file_path)
             file_extension = file_path.split('.')[-1]
             if file_extension == 'xml':
-                if self.verify_document(self.gui.public_key_path, self.gui.file_path, file_path):
+                if self.verify_document(file_path):
                     messagebox.showinfo('Information', 'The signature verification passed!')
                 else:
                     messagebox.showwarning('Information', 'The signature verification failed!')
@@ -163,11 +178,8 @@ class GUI_Manager:
             file_hash = self.get_document_hash()
             private_key = self.get_private_key()
             if private_key is not None:
-                encrypted_file_hash = private_key.sign(
-                    file_hash,
-                    padding.PKCS1v15(),
-                    hashes.SHA256()
-                )
+                encrypted_file_hash = private_key.sign(file_hash, padding.PKCS1v15(), hashes.SHA256())
+                encrypted_file_hash = base64.b64encode(encrypted_file_hash).decode('utf-8')
             else:
                 messagebox.showerror('The private key is not valid!')
                 return
