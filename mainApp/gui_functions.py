@@ -1,17 +1,15 @@
-import datetime
-import tkinter as tk
-import os
-import re
-import xml.dom.minidom
-import psutil
 import base64
+import datetime
+import os
+import psutil
+import re
+import tkinter as tk
+import xml.dom.minidom
 
-from tkinter import filedialog, messagebox, simpledialog
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
-
+from tkinter import filedialog, messagebox, simpledialog
 
 CURRENT_USER = '#00FF00'  # green
 ANOTHER_USER = '#FF0000'  # red
@@ -23,6 +21,24 @@ class GUI_Manager:
 
     def __init__(self, gui):
         self.gui = gui
+
+    def is_public_key_exist(self):
+        if self.gui.public_key_path is None:
+            messagebox.showwarning('Warning', 'The public key is not found!')
+            return False
+        return True
+
+    def is_private_key_exist(self):
+        if self.gui.private_key_path is None:
+            messagebox.showwarning('Warning', 'The private key is not found!')
+            return False
+        return True
+
+    def is_file_exist(self):
+        if self.gui.file_path is None:
+            messagebox.showwarning('Warning', 'The file is not chosen!')
+            return False
+        return True
 
     def get_private_key(self):
         # get user's pin and clear the input
@@ -54,11 +70,11 @@ class GUI_Manager:
     def get_public_key(self):
 
         with open(f"{self.gui.public_key_path}", "r") as public_key_file:
-            public_key_format = public_key_file.read()
+            public_key_pem = public_key_file.read()
 
-        public_key_format = public_key_format.encode('utf-8')
+        public_key_pem = public_key_pem.encode('utf-8')
         public_key = serialization.load_pem_public_key(
-            public_key_format,
+            public_key_pem,
             backend=default_backend()
         )
 
@@ -77,7 +93,7 @@ class GUI_Manager:
             messagebox.showwarning('Warning', 'Wrong file!')
 
     @staticmethod
-    def find_pendrive_path():
+    def get_pendrive_paths():
         pendrives = []
         drives = psutil.disk_partitions()
         for drive in drives:
@@ -85,9 +101,9 @@ class GUI_Manager:
                 pendrives.append(drive.device)
         return pendrives
 
-    def find_private_key(self):
-        pendrives_path = self.find_pendrive_path()
-        for pendrive_path in pendrives_path:
+    def get_private_key_path(self):
+        pendrive_paths = self.get_pendrive_paths()
+        for pendrive_path in pendrive_paths:
             private_key_path = pendrive_path + 'private_key.pem'
             if os.path.exists(private_key_path):
                 self.gui.private_key_path = private_key_path
@@ -110,7 +126,7 @@ class GUI_Manager:
             self.gui.public_key_info.config(text='NOT FOUND')
             messagebox.showwarning('Warning', 'Wrong file!')
 
-    def verify_document(self, signature_path):
+    def is_verified(self, signature_path):
         # read encrypted file hash from signature file
         try:
             signature = xml.dom.minidom.parse(signature_path)
@@ -124,25 +140,18 @@ class GUI_Manager:
         if public_key is None:
             return False
 
-        # get file hash
-        file_hash = self.get_document_hash()
-
         try:
-            public_key.verify(encrypted_hash, file_hash, padding.PKCS1v15(), hashes.SHA256())
+            public_key.verify(encrypted_hash, self.get_document_hash(), padding.PKCS1v15(), hashes.SHA256())
             return True
         except:
             return False
 
     def verify_file(self):
-        if self.gui.file_path is None:
-            messagebox.showwarning('Warning', 'The file is not chosen!')
-        elif self.gui.public_key_path is None:
-            messagebox.showwarning('Warning', 'The public key is not found!')
-        else:
-            file_path = filedialog.askopenfilename(filetypes=(("XML files", "*.xml*"),))
-            file_extension = file_path.split('.')[-1]
+        if self.is_file_exist() and self.is_public_key_exist():
+            signature_path = filedialog.askopenfilename(filetypes=(("XML files", "*.xml*"),))
+            file_extension = signature_path.split('.')[-1]
             if file_extension == 'xml':
-                if self.verify_document(file_path):
+                if self.is_verified(signature_path):
                     messagebox.showinfo('Information', 'The signature verification passed!')
                 else:
                     messagebox.showwarning('Information', 'The signature verification failed!')
@@ -161,15 +170,7 @@ class GUI_Manager:
         return file_hash
 
     def sign_file(self):
-        if self.gui.file_path is None:
-            messagebox.showwarning('Warning', 'The file is not chosen!')
-        elif self.gui.private_key_path is None:
-            messagebox.showwarning('Warning', 'The private key is not found!')
-        else:
-            filename = self.gui.file_path.split('/')[-1].split('.')[0]
-            file_extension = self.gui.file_path.split('.')[-1]
-            file_size = os.path.getsize(self.gui.file_path)
-            last_mod_time = os.path.getmtime(self.gui.file_path)
+        if self.is_file_exist() and self.is_private_key_exist():
             try:
                 user = os.getlogin()
             except:
@@ -183,46 +184,37 @@ class GUI_Manager:
             else:
                 messagebox.showerror('The private key is not valid!')
                 return
-            timestamp = datetime.datetime.now()
 
             xml_data = f"""
             <signature>
                 <file>
-                    <name>{filename}</name>
-                    <extension>{file_extension}</extension>
-                    <size>{file_size}</size>
-                    <date>{last_mod_time}</date>
+                    <name>{self.gui.file_path.split('/')[-1].split('.')[0]}</name>
+                    <extension>{self.gui.file_path.split('.')[-1]}</extension>
+                    <size>{os.path.getsize(self.gui.file_path)}</size>
+                    <date>{os.path.getmtime(self.gui.file_path)}</date>
                 </file>
                 <user_name>{user}</user_name>
-                <encrypted_hash>temp_value</encrypted_hash>
-                <timestamp>{timestamp}</timestamp>
+                <encrypted_hash>{encrypted_file_hash}</encrypted_hash>
+                <timestamp>{datetime.datetime.now()}</timestamp>
             </signature>
             """
             xml_data = xml.dom.minidom.parseString(xml_data)
-            encrypted_hash_xml = xml_data.getElementsByTagName('encrypted_hash')[0]
-            encrypted_hash_xml.firstChild.data = encrypted_file_hash
 
             xml_path = os.path.dirname(self.gui.file_path) + '/signature.xml'
             with open(f"{xml_path}", "w") as xml_file:
                 xml_file.write(xml_data.toprettyxml())
 
+            messagebox.showinfo('Information', f'The signature was created\n{xml_path}')
+
     def encrypt_file(self):
-        if self.gui.file_path is None:
-            messagebox.showwarning('Warning', 'The file is not chosen!')
-        elif self.gui.private_key_path is None:
-            messagebox.showwarning('Warning', 'The private key is not found!')
-        else:
+        if self.is_file_exist() and self.is_private_key_exist():
             #
             # to implement file encryption
             #
             print("encrypt")
 
     def decrypt_file(self):
-        if self.gui.file_path is None:
-            messagebox.showwarning('Warning', 'The file is not chosen!')
-        elif self.gui.public_key_path is None:
-            messagebox.showwarning('Warning', 'The public key is not found!')
-        else:
+        if self.is_file_exist() and self.is_public_key_exist():
             #
             # to implement file decryption
             #

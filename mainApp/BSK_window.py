@@ -42,7 +42,7 @@ class BSK_window(tk.Tk):
         self.file_name.place(x=20, y=75)
 
         # search for private key from pendrive
-        self.private_key_button = tk.Button(self, text='Use private key', command=self.gui_manager.find_private_key)
+        self.private_key_button = tk.Button(self, text='Use private key', command=self.gui_manager.get_private_key_path)
         self.private_key_button.config(width=30)
         self.private_key_button.place(x=260, y=50)
 

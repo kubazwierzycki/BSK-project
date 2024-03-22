@@ -1,32 +1,31 @@
-import tkinter as tk
-import re
 import psutil
+import re
+import tkinter as tk
 
-from tkinter import messagebox
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import rsa
+from tkinter import messagebox
 
-BACKGROUND_COLOR = '#ADD8E6'
-FOREGROUND_COLOR = '#000000'
+BACKGROUND_COLOR = '#ADD8E6'  # blue
+FOREGROUND_COLOR = '#000000'  # black
 
 
 class GenerateKeysApp(tk.Tk):
 
     @staticmethod
     def find_pendrive_path():
-        drives = psutil.disk_partitions()
-        for drive in drives:
-            if drive.opts == 'rw,removable':
-                return drive.device
+        disks = psutil.disk_partitions()
+        for disk in disks:
+            if disk.opts == 'rw,removable':
+                return disk.device
         return None
 
     def save_keys(self, pin):
         # generate, encrypt and save private key
         # default_backend() - responsible for random seed
         private_key = rsa.generate_private_key(
-            public_exponent=65537, key_size=2048, backend=default_backend()
+            public_exponent=65537, key_size=4096, backend=default_backend()
         )
 
         # generate hash for pin
@@ -45,14 +44,16 @@ class GenerateKeysApp(tk.Tk):
 
         # generate and save public key
         public_key = private_key.public_key()
-        public_key_format = public_key.public_bytes(
+        public_key_pem = public_key.public_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         )
         with open(f"{self.pendrive_path}public_key.pem", "wb") as public_key_file:
-            public_key_file.write(public_key_format)
+            public_key_file.write(public_key_pem)
 
-        messagebox.showinfo('Success', 'Key were generated and saved')
+        messagebox.showinfo('Success', f'Keys were generated and saved'
+                                       f'\n{self.pendrive_path}private_key.pem'
+                                       f'\n{self.pendrive_path}public_key.pem')
 
     def generate_keys(self):
         text = self.pin_number.get(1.0, tk.END)
@@ -62,8 +63,8 @@ class GenerateKeysApp(tk.Tk):
             if self.pendrive_path is None:
                 messagebox.showwarning('Warning', 'The pendrive is not found!')
             else:
-                regex = regex[0]
-                self.save_keys(regex)
+                pin = regex[0]
+                self.save_keys(pin)
         else:
             messagebox.showwarning('Warning', 'The PIN number must contain only digits!')
 
