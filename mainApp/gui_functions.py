@@ -15,7 +15,9 @@ CURRENT_USER = '#00FF00'  # green
 ANOTHER_USER = '#FF0000'  # red
 ACTIVE_BUTTON = '#FFFFFF'  # white
 INACTIVE_BUTTON = '#BBBBBB'  # gray
-
+ERROR_MESSAGE_TITLE = 'ERROR!'
+WARNING_MESSAGE_TITLE = 'Warning!'
+INFO_MESSAGE_TITLE = 'Information'
 
 class GUI_Manager:
 
@@ -24,19 +26,19 @@ class GUI_Manager:
 
     def is_public_key_exist(self):
         if self.gui.public_key_path is None:
-            messagebox.showwarning('Warning', 'The public key is not found!')
+            messagebox.showwarning(WARNING_MESSAGE_TITLE, 'The public key is not found!')
             return False
         return True
 
     def is_private_key_exist(self):
         if self.gui.private_key_path is None:
-            messagebox.showwarning('Warning', 'The private key is not found!')
+            messagebox.showwarning(WARNING_MESSAGE_TITLE, 'The private key is not found!')
             return False
         return True
 
     def is_file_exist(self):
         if self.gui.file_path is None:
-            messagebox.showwarning('Warning', 'The file is not chosen!')
+            messagebox.showwarning(WARNING_MESSAGE_TITLE, 'The file is not chosen!')
             return False
         return True
 
@@ -62,7 +64,7 @@ class GUI_Manager:
                 backend=default_backend()
             )
         except:
-            messagebox.showerror('Error!', 'The private key is broken or the PIN is incorrect!')
+            messagebox.showerror(ERROR_MESSAGE_TITLE, 'The private key is broken or the PIN is incorrect!')
             return None
 
         return private_key
@@ -90,7 +92,7 @@ class GUI_Manager:
         else:
             self.gui.file_path = None
             self.gui.file_name.config(text='file (*.pdf / *.txt)')
-            messagebox.showwarning('Warning', 'Wrong file!')
+            messagebox.showwarning(WARNING_MESSAGE_TITLE, 'Wrong file!')
 
     @staticmethod
     def get_pendrive_paths():
@@ -111,7 +113,7 @@ class GUI_Manager:
                 return private_key_path
         self.gui.private_key_path = None
         self.gui.private_key_info.config(text='NOT FOUND')
-        messagebox.showwarning('Warning', 'The pendrive or the private key was not found!')
+        messagebox.showwarning(WARNING_MESSAGE_TITLE, 'The pendrive or the private key was not found!')
         return None
 
     def choose_public_key(self):
@@ -124,7 +126,7 @@ class GUI_Manager:
         else:
             self.gui.public_key_path = None
             self.gui.public_key_info.config(text='NOT FOUND')
-            messagebox.showwarning('Warning', 'Wrong file!')
+            messagebox.showwarning(WARNING_MESSAGE_TITLE, 'Wrong file!')
 
     def is_verified(self, signature_path):
         # read encrypted file hash from signature file
@@ -133,7 +135,7 @@ class GUI_Manager:
             encrypted_hash = signature.getElementsByTagName('encrypted_hash')[0].firstChild.data
             encrypted_hash = base64.b64decode(encrypted_hash)
         except:
-            messagebox.showerror('Error', 'Signature file is incorrect!')
+            messagebox.showerror(ERROR_MESSAGE_TITLE, 'Signature file is incorrect!')
             return False
 
         public_key = self.get_public_key()
@@ -152,11 +154,11 @@ class GUI_Manager:
             file_extension = signature_path.split('.')[-1]
             if file_extension == 'xml':
                 if self.is_verified(signature_path):
-                    messagebox.showinfo('Information', 'The signature verification passed!')
+                    messagebox.showinfo(INFO_MESSAGE_TITLE, 'The signature verification passed!')
                 else:
-                    messagebox.showwarning('Information', 'The signature verification failed!')
+                    messagebox.showwarning(WARNING_MESSAGE_TITLE, 'The signature verification failed!')
             else:
-                messagebox.showwarning('Warning', 'Wrong file!')
+                messagebox.showwarning(WARNING_MESSAGE_TITLE, 'Wrong file!')
 
     def get_document_hash(self):
         with open(self.gui.file_path, 'rb') as file:
@@ -182,7 +184,7 @@ class GUI_Manager:
                 encrypted_file_hash = private_key.sign(file_hash, padding.PKCS1v15(), hashes.SHA256())
                 encrypted_file_hash = base64.b64encode(encrypted_file_hash).decode('utf-8')
             else:
-                messagebox.showerror('The private key is not valid!')
+                messagebox.showerror(ERROR_MESSAGE_TITLE, 'The private key is not valid!')
                 return
 
             xml_data = f"""
@@ -204,21 +206,51 @@ class GUI_Manager:
             with open(f"{xml_path}", "w") as xml_file:
                 xml_file.write(xml_data.toprettyxml())
 
-            messagebox.showinfo('Information', f'The signature was created\n{xml_path}')
+            messagebox.showinfo(INFO_MESSAGE_TITLE, f'The signature was created\n{xml_path}')
 
     def encrypt_file(self):
-        if self.is_file_exist() and self.is_private_key_exist():
-            #
-            # to implement file encryption
-            #
-            print("encrypt")
+        if self.is_file_exist() and self.is_public_key_exist():
+            with open(f'{self.gui.file_path}', 'rb') as original_file:
+                original_content = original_file.read()
+
+            public_key = self.get_public_key()
+            try:
+                encrypted_content = public_key.encrypt(original_content, padding.PKCS1v15())
+            except:
+                messagebox.showerror(ERROR_MESSAGE_TITLE, 'The file could not be encrypted')
+                return
+
+            dir_name = os.path.dirname(self.gui.file_path)
+            file_name = self.gui.file_path.split('/')[-1].split('.')[0]
+            file_extension = self.gui.file_path.split('.')[-1]
+
+            with open(f'{dir_name}/{file_name}(encrypted).{file_extension}', 'wb') as encrypted_file:
+                encrypted_file.write(encrypted_content)
+
+            messagebox.showinfo(INFO_MESSAGE_TITLE, f'The file was encrypted\n'
+                                               f'{dir_name}/{file_name}(encrypted).{file_extension}')
 
     def decrypt_file(self):
-        if self.is_file_exist() and self.is_public_key_exist():
-            #
-            # to implement file decryption
-            #
-            print("decrypt")
+        if self.is_file_exist() and self.is_private_key_exist():
+            with open(f'{self.gui.file_path}', 'rb') as encrypted_file:
+                encrypted_content = encrypted_file.read()
+
+            private_key = self.get_private_key()
+            try:
+                original_content = private_key.decrypt(encrypted_content, padding.PKCS1v15())
+            except:
+                messagebox.showerror(ERROR_MESSAGE_TITLE, 'The file could not be decrypted')
+                return
+
+            dir_name = os.path.dirname(self.gui.file_path)
+            file_name = self.gui.file_path.split('/')[-1].split('.')[0].split('(')[0]
+            file_extension = self.gui.file_path.split('.')[-1]
+
+            with open(f'{dir_name}/{file_name}(decrypted).{file_extension}', 'wb') as decrypted_file:
+                decrypted_file.write(original_content)
+
+            messagebox.showinfo(INFO_MESSAGE_TITLE, f'The file was decrypted\n'
+                                               f'{dir_name}/{file_name}(decrypted).{file_extension}')
 
     def reset_gui_variables(self):
         self.gui.file_path = None
