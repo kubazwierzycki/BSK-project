@@ -265,7 +265,7 @@ class GUI_Manager:
         self.gui.user_B.config(bg=ANOTHER_USER)
         self.gui.private_key_button.config(bg=ACTIVE_BUTTON, state=tk.ACTIVE)
         self.gui.sign_button.config(bg=ACTIVE_BUTTON, state=tk.ACTIVE)
-        self.gui.encrypt_button.config(bg=ACTIVE_BUTTON, state=tk.ACTIVE)
+        self.gui.decrypt_button.config(bg=ACTIVE_BUTTON, state=tk.ACTIVE)
 
         self.reset_gui_variables()
 
@@ -274,6 +274,6 @@ class GUI_Manager:
         self.gui.user_A.config(bg=ANOTHER_USER)
         self.gui.private_key_button.config(bg=INACTIVE_BUTTON, state=tk.DISABLED)
         self.gui.sign_button.config(bg=INACTIVE_BUTTON, state=tk.DISABLED)
-        self.gui.encrypt_button.config(bg=INACTIVE_BUTTON, state=tk.DISABLED)
+        self.gui.decrypt_button.config(bg=INACTIVE_BUTTON, state=tk.DISABLED)
 
         self.reset_gui_variables()
